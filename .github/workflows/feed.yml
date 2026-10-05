@@ -1,0 +1,55 @@
+name: Сборка фида для tomas.kz
+
+on:
+  schedule:
+    # каждые 3 часа (UTC), в 17 минут — чтобы не попадать в общую очередь на :00
+    - cron: "17 */3 * * *"
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths: ["build_feed.py", ".github/workflows/feed.yml"]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Установка lxml
+        run: pip install lxml
+
+      - name: Сборка фида
+        env:
+          FEED_URL: ${{ secrets.FEED_URL }}
+          MARKUP: "0.10"
+          ROUND_TO: "10"
+          MIN_OFFERS: "10000"
+        run: |
+          python build_feed.py --out public/feed.xml
+          cp index.html public/index.html
+          ls -la public
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

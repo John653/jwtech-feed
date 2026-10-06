@@ -4,7 +4,7 @@ JWTech: промежуточный YML-фид для tomas.kz на основе 
 
 Что делает:
   * цена = дилерская (purchase_price) + MARKUP, округление вверх до ROUND_TO тг;
-  * если у поставщика цена 0 (розничная или дилерская) — товар «под заказ» без цены (type="on.demand");
+  * если у поставщика цена 0 или заглушка меньше MIN_PRICE (обычно 1 тг) — товар «под заказ» без цены (type="on.demand");
   * убирает закупочную цену из фида;
   * убирает уценённые позиции (id с буквой на конце или параметр «Уценка=Да»);
   * наличие переносит в атрибут available, как требует tomas.kz;
@@ -30,6 +30,8 @@ from lxml import etree
 MARKUP = float(os.environ.get("MARKUP", "0.10"))       # +10% к дилерской цене
 ROUND_TO = int(os.environ.get("ROUND_TO", "10"))       # округление вверх до 10 тг
 MIN_OFFERS = int(os.environ.get("MIN_OFFERS", "10000"))  # меньше — считаем фид битым
+# Цена ниже порога (обычно 1 тг) — это заглушка поставщика «цена по запросу», а не реальная цена
+MIN_PRICE = float(os.environ.get("MIN_PRICE", "10"))
 
 SHOP_NAME = "JWTech"
 SHOP_URL = "https://jwtech.tomas.kz"
@@ -136,8 +138,8 @@ def transform(raw: bytes):
         if url_el is not None:
             offer.remove(url_el)
 
-        if not dealer or dealer <= 0 or not retail or retail <= 0:
-            # Цена у поставщика не указана — «под заказ», без цены
+        if not dealer or dealer < MIN_PRICE or not retail or retail < MIN_PRICE:
+            # Цена у поставщика не указана (0) или стоит заглушка (1 тг) — «под заказ», без цены
             if price_el is not None:
                 offer.remove(price_el)
             if qis_el is not None:
